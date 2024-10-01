@@ -79,6 +79,7 @@ object CollocationError {
   val LOCK_TIMEOUT = "collocation.lock-timeout"
 
   val STORE_NOT_ACCEPTING_NEW_DATASETS = "collocation.secondary.store-not-accepting-new-datasets"
+  val STORE_DOES_NOT_SUPPORT_COLLOCATION = "collocation.secondary.store-does-not-support-collocation"
   val DATASET_NOT_FOUND_IN_STORE = "collocation.secondary.dataset-not-found-in-store"
 
   val INVALID_JOB_ID = "collocation.job.invalid-uuid"

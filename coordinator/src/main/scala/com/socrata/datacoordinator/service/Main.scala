@@ -266,6 +266,10 @@ class Main(common: SoQLCommon, serviceConfig: ServiceConfig) {
               if (!groupConfig.instances.keySet(fromStoreId)) return Left(StoreNotFound(fromStoreId))
               if (!groupConfig.instances.keySet(toStoreId)) return Left(StoreNotFound(toStoreId))
 
+              if (!groupConfig.respectsCollocation) {
+                return Right(Left(StoreDisallowsCollocationMoveJob))
+              }
+
               if (!groupConfig.instances(toStoreId).acceptingNewDatasets) {
                 log.warn("Cannot move dataset to store {} not accepting new datasets", toStoreId)
                 return Right(Left(StoreNotAcceptingDatasets))

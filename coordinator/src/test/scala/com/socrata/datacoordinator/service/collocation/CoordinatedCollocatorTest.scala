@@ -1,15 +1,15 @@
 package com.socrata.datacoordinator.service.collocation
 
 import java.util.UUID
-
 import com.socrata.datacoordinator.common.collocation.CollocationLockTimeout
 import com.socrata.datacoordinator.collocation.TestData
 import com.socrata.datacoordinator.common.collocation.CollocationLock
 import com.socrata.datacoordinator.id.DatasetInternalName
-import com.socrata.datacoordinator.resources.{SecondariesOfDatasetResult, VersionSpec, SecondaryValue}
+import com.socrata.datacoordinator.resources.{SecondariesOfDatasetResult, SecondaryValue, VersionSpec}
 import com.socrata.datacoordinator.resources.collocation.{CollocatedDatasetsResult, SecondaryMoveJobsResult}
 import com.socrata.datacoordinator.secondary.SecondaryMetric
 import com.socrata.datacoordinator.secondary.config.mock.{SecondaryGroupConfig, StoreConfig}
+import org.scalacheck.Prop.True
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSuite, Matchers}
 
@@ -95,13 +95,14 @@ class CoordinatedCollocatorTest extends FunSuite with Matchers with MockFactory 
 
   def groupConfig(numReplicas: Int,
                   instances: Set[String],
+                  groupAcceptingCollocation: Boolean = true,
                   instancesNotAcceptingNewDatasets: Set[String] = Set.empty) = {
     val instanceMap = instances.map { instance =>
       val config = StoreConfig(1000, !instancesNotAcceptingNewDatasets(instance))
       (instance, config)
     }.toMap
 
-    SecondaryGroupConfig(numReplicas, instanceMap, true)
+    SecondaryGroupConfig(numReplicas, instanceMap, groupAcceptingCollocation)
   }
 
   val datasetsEmpty = Set.empty[DatasetInternalName]
@@ -374,6 +375,42 @@ class CoordinatedCollocatorTest extends FunSuite with Matchers with MockFactory 
         commonShould(result)
         executeShould(jobId, result, moves)
       }
+    }
+  }
+
+
+  test("should return an error for disallowing collocation when collocating in a disallowed group") {
+    withMocks(Set(storeGroupA), { coordinator =>
+      (coordinator.secondaryGroupConfigs _)
+        .expects()
+        .returns(Map(
+          storeGroupB -> groupConfig(2, storesGroupB, true),
+          storeGroupA -> groupConfig(2, storesGroupA, false)))
+    }) { case (collocator, _) =>
+        val (result, _) = collocator.executeCollocation(UUID.randomUUID(), storeGroupA, requestEmpty)
+
+        println(result)
+        result match {
+          case Left(_) =>
+          case Right(_) => fail()
+        }
+    }
+  }
+
+  test("should allow collocation when collocating in an allowed group, but is also in a disallowed group") {
+    withMocks(Set(storeGroupA), { coordinator =>
+      (coordinator.secondaryGroupConfigs _)
+        .expects()
+        .returns(Map(
+          storeGroupB -> groupConfig(2, storesGroupB, true),
+          storeGroupA -> groupConfig(2, storesGroupA, false)))
+    }) { case (collocator, _) =>
+        val result = collocator.explainCollocation(storeGroupB, requestEmpty)
+
+        result match {
+          case Right(_) =>
+          case Left(_) => fail()
+        }
     }
   }
 

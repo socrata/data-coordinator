@@ -1,12 +1,11 @@
 package com.socrata.datacoordinator.service.collocation
 
 import java.util.UUID
-
 import com.rojoma.json.v3.codec.JsonEncode
 import com.rojoma.json.v3.util._
 import com.socrata.datacoordinator.common.collocation.{CollocationLock, CollocationLockError, CollocationLockTimeout}
 import com.socrata.datacoordinator.id.DatasetInternalName
-import com.socrata.datacoordinator.resources.collocation.{CollocatedDatasetsResult, DatasetNotInStore, SecondaryMoveJobRequest, StoreNotAcceptingDatasets}
+import com.socrata.datacoordinator.resources.collocation.{CollocatedDatasetsResult, DatasetNotInStore, SecondaryMoveJobRequest, StoreNotAcceptingDatasets, StoreDisallowsCollocationMoveJob}
 import com.socrata.datacoordinator.service.collocation.secondary.stores.SecondaryStoreSelector
 import org.joda.time.DateTime
 
@@ -160,6 +159,7 @@ class CoordinatedCollocator(collocationGroup: Set[String],
           log.info("Instances in store group: {} (repfactor {})", instances, replicationFactor)
 
           request match {
+            case _ if (!groupConfig.respectsCollocation) => Left(StoreDisallowsCollocation(storeGroup))
             case CollocationRequest(collocations, _) if collocations.isEmpty => Right(CollocationResult.canonicalEmpty)
             case CollocationRequest(collocations, costLimits) =>
               val collocationEdges = collocations.map { collocation =>
@@ -318,7 +318,6 @@ class CoordinatedCollocator(collocationGroup: Set[String],
     log.info("Executing collocation on secondary store group {}", storeGroup)
     explainCollocation(storeGroup, request) match {
       case Right(CollocationResult(_, Approved, _, cost, moves)) =>
-
         log.info("Ensuring required move jobs exists: {}", moves)
         val moveResults = moves.map { move =>
           val request = SecondaryMoveJobRequest(jobId, move.storeIdFrom, move.storeIdTo)
@@ -328,6 +327,10 @@ class CoordinatedCollocator(collocationGroup: Set[String],
                 Right(datasetNewToStore)
               case Right(Left(StoreNotAcceptingDatasets)) =>
                 log.error(s"Attempted to move dataset ${move.datasetInternalName} to store {} not accepting datasets!",
+                  move.storeIdTo)
+                Left(UnexpectedError("Attempted to move dataset to store not accepting new datasets during collocation!"))
+              case Right(Left(StoreDisallowsCollocationMoveJob)) =>
+                log.error(s"Attempted to move dataset ${move.datasetInternalName} to store {} which disallows collocation!",
                   move.storeIdTo)
                 Left(UnexpectedError("Attempted to move dataset to store not accepting new datasets during collocation!"))
               case Right(Left(DatasetNotInStore)) =>

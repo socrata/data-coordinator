@@ -25,6 +25,7 @@ sealed abstract class ErrorResult(message: String) extends Exception(message)
 
 sealed abstract class RequestError(message: String) extends ErrorResult(message)
 
+case class StoreDisallowsCollocation(store: String) extends RequestError(store)
 case class ResponseError(error: DecodeError) extends RequestError(error.english)
 case class UnexpectedError(message: String) extends RequestError(message)
 case class UnexpectedCoordinatorError(errorCode: String) extends RequestError(s"Unexpected result code $errorCode from other coordinator")
@@ -276,6 +277,8 @@ class HttpCoordinator(isThisInstance: String => Boolean,
             case 400 => response.value[CoordinatorError]() match {
               case Right(CoordinatorError(CollocationError.STORE_NOT_ACCEPTING_NEW_DATASETS, _)) =>
                 Right(Right(Left(StoreNotAcceptingDatasets)))
+              case Right(CoordinatorError(CollocationError.STORE_DOES_NOT_SUPPORT_COLLOCATION, _)) =>
+                Right(Right(Left(StoreDisallowsCollocationMoveJob)))
               case Right(CoordinatorError(CollocationError.DATASET_NOT_FOUND_IN_STORE, _)) =>
                 Right(Right(Left(DatasetNotInStore)))
               case Right(error) => Left(UnexpectedError(s"Unexpected error of type ${error.getClass.getName}"))

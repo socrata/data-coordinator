@@ -7,7 +7,8 @@ import com.socrata.datacoordinator.service.collocation._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FunSuite, Matchers}
 
-class SecondaryManifestsCollocateResourceTest extends FunSuite with Matchers with MockFactory {
+class
+SecondaryManifestsCollocateResourceTest extends FunSuite with Matchers with MockFactory {
   def withMock(storeGroup: String,
                explain: Boolean = false)
               (collocatorExpectations: Collocator => Unit)(f: (SecondaryManifestsCollocateResource, UUID) => Unit): Unit = {
