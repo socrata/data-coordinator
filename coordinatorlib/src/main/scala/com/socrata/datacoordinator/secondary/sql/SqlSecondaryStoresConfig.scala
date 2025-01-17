@@ -12,7 +12,7 @@ class SqlSecondaryStoresConfig(conn: Connection, timingReport: TimingReport) ext
 
   def lookup(storeId: String): Option[SecondaryConfigInfo] = {
     val sql = """
-      SELECT store_id, next_run_time, interval_in_seconds, group_name
+      SELECT store_id, next_run_time, interval_in_seconds, group_name, is_feedback_secondary
         FROM secondary_stores_config
        WHERE store_id = ?""".stripMargin
 
@@ -26,7 +26,8 @@ class SqlSecondaryStoresConfig(conn: Connection, timingReport: TimingReport) ext
           rs.getString("store_id"),
           new DateTime(rs.getTimestamp("next_run_time").getTime),
           rs.getInt("interval_in_seconds"),
-          Option(rs.getString("group_name")).getOrElse("")))
+          Option(rs.getString("group_name")).getOrElse(""),
+          rs.getBoolean("is_feedback_secondary")))
       } else {
         None
       }

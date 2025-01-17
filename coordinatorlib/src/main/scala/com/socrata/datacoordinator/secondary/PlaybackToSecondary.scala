@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory
 
 object PlaybackToSecondary {
   type SuperUniverse[CT, CV] = Universe[CT, CV] with Commitable with
+                                                     SecondaryStoresConfigProvider with
                                                      SecondaryManifestProvider with
                                                      SecondaryMetricsProvider with
                                                      DatasetMapReaderProvider with
@@ -679,13 +680,25 @@ class PlaybackToSecondary[CT, CV](u: PlaybackToSecondary.SuperUniverse[CT, CV],
       }
     }
 
+    def dsInfoOf(datasetId: DatasetId) = {
+      u.secondaryStoresConfig.lookup(secondary.storeId) match {
+        case Some(config) if config.isFeedback =>
+          logger.info("Non-exclusive resync")
+          u.datasetMapReader.datasetInfo(datasetId, repeatableRead = true)
+        case _ =>
+          logger.info("exclusive resync")
+          u.datasetMapWriter.datasetInfo(datasetId, datasetLockTimeout, semiExclusive = true)
+      }
+    }
+
     def resync(): Unit = {
       val mostRecentlyUpdatedCopyInfo = retrying[Option[metadata.CopyInfo]]({
         timingReport("resync", "dataset" -> datasetId) {
           u.commit() // all updates must be committed before we can change the transaction isolation level
           val r = u.datasetMapReader
-          r.datasetInfo(datasetId, repeatableRead = true) match {
-            // transaction isolation level is now set to REPEATABLE READ
+          val w = u.datasetMapWriter
+          dsInfoOf(datasetId) match {
+            // transaction isolation level is now set to REPEATABLE READ or we have a lock on the dataset
             case Some(datasetInfo) =>
               val allCopies = r.allCopies(datasetInfo).toSeq.sortBy(_.dataVersion)
               val mostRecentCopy =
